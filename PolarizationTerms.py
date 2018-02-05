@@ -168,10 +168,6 @@ class PolarizationTerms:
             "sum(gamma / ((omega - 2*omega_M2 - 2*comb_omega2)**2 + gamma**2), axis=2)",
             local_dict=vars(self)
         ).sum(axis=1)
-        # self.comb_basis = ne.evaluate(
-        #     "sum(gamma / ((omega - omega_M1 - comb_omega1 - omega_M2 - comb_omega2)**2 + gamma**2), axis=2)",
-        #     local_dict=vars(self)
-        # ).sum(axis=1)
         self.pol2_freq_matrix = np.asarray([self.calculate_total_pol(**instance) for instance in self.molecules]).T
 
     def calculate_pol_12_21(self, m, n, **params):
@@ -203,9 +199,20 @@ class PolarizationTerms:
     def calculate_total_pol(self, **params):
         return self.calculate_pol_12_21(1, 2, **params) + self.calculate_pol_12_21(2, 1, **params)
 
+    def calculate_chi(self, m, n, **params):
+        return 1./((params['w_'+str(n)+str(0)] - self.frequency[:, np.newaxis]
+                    - self.frequency[np.newaxis, :] - 1j*params['g_'+str(n)+str(0)])
+                   *(params['w_'+str(m)+str(0)] - self.frequency[:, np.newaxis] - 1j*params['g_'+str(m)+str(0)])) \
+               + 1./((params['w_'+str(n)+str(0)] - self.frequency[:, np.newaxis]
+                      - self.frequency[np.newaxis, :] - 1j*params['g_'+str(n)+str(0)])
+                     *(params['w_'+str(m)+str(0)] - self.frequency[np.newaxis, :] - 1j*params['g_'+str(m)+str(0)]))
+
+    def calculate_broad_response(self, **params):
+        return (self.omega - self.omega_M1 - self.omega_M2 - self.comb_omega1 - self.comb_omega2)\
+               /((self.omega - self.omega_M1 - self.omega_M2 - self.comb_omega1 - self.comb_omega2)**2 + 4.*self.gamma**2)
+
 
 if __name__ == '__main__':
-
     w_excited_1 = 2.354
     w_excited_2 = 4.708
 
@@ -213,7 +220,7 @@ if __name__ == '__main__':
         N_molecules=3,
         N_order=6,
         N_order_energy=9,
-        N_comb=30,
+        N_comb=20,
         N_frequency=1000,
         freq_halfwidth=1e-5,
 
@@ -233,36 +240,43 @@ if __name__ == '__main__':
         g_spacing_20=0.35,
     )
 
+    # plt.show()
     # print ensemble.__init__.__doc__
 
-    # pol_order = np.zeros(20)
-    # order = np.zeros(20)
-    # for i in range(20):
-    #     ensemble.gamma=2.5*10**(5-i)
-    #     order[i]=ensemble.gamma
-    #     pol_order[i] = np.abs(ensemble.calculate_total_pol(**ensemble.molecules[0]).max())
-    #     print order[i], pol_order[i]
-    #
-    # plt.figure()
-    # plt.plot(-np.log10(order), np.log10(pol_order))
-    # plt.show()
-    pol2_mat = np.asarray([ensemble.calculate_total_pol(**m).real for m in ensemble.molecules])
+    pol_order = np.zeros(20)
+    order = np.zeros(20)
+    for i in range(20):
+        ensemble.gamma=2.5*10**(5-i)
+        order[i]=ensemble.gamma
+        pol_order[i] = np.abs(ensemble.calculate_total_pol(**ensemble.molecules[0]).max())
+        print order[i], pol_order[i]
+
+    plt.figure()
+    plt.plot(-np.log10(order), np.log10(pol_order))
+    plt.show()
+    pol2_mat = np.asarray([ensemble.calculate_total_pol(**m) for m in ensemble.molecules])
 
     factor = np.abs(ensemble.calculate_total_pol(**ensemble.molecules[0]).max()) / np.abs(ensemble.field1.max())
     pol2_mat /= factor
-    plt.figure()
+    fig = plt.figure()
 
-    # plt.subplot(221)
-    plt.plot(ensemble.frequency, pol2_mat[0], 'r')
-    plt.plot(ensemble.frequency, pol2_mat[1], 'b')
-    plt.plot(ensemble.frequency, pol2_mat[2], 'k')
+    plt.subplot(311)
+    plt.plot(ensemble.frequency, pol2_mat[0]/pol2_mat.max(), 'r')
+    plt.grid()
+    plt.subplot(312)
+    plt.plot(ensemble.frequency, pol2_mat[1]/pol2_mat.max(), 'b')
+    plt.grid()
+    plt.subplot(313)
+    plt.plot(ensemble.frequency, pol2_mat[2]/pol2_mat.max(), 'k')
+    plt.grid()
 
-    # plt.subplot(222)
-    # plt.plot(ensemble.frequency, ensemble.calculate_pol_12_21_021(**ensemble.molecules[0]) / factor, 'r')
-    # plt.plot(ensemble.frequency, ensemble.calculate_pol_12_21_021(**ensemble.molecules[1]) / factor, 'b')
-    # plt.plot(ensemble.frequency, ensemble.calculate_pol_12_21_021(**ensemble.molecules[2]) / factor, 'k')
+    plt.subplot(222)
+    plt.plot(ensemble.frequency, ensemble.calculate_pol_12_21_021(**ensemble.molecules[0]) / factor, 'r')
+    plt.plot(ensemble.frequency, ensemble.calculate_pol_12_21_021(**ensemble.molecules[1]) / factor, 'b')
+    plt.plot(ensemble.frequency, ensemble.calculate_pol_12_21_021(**ensemble.molecules[2]) / factor, 'k')
 
-    # plt.subplot(212)
+    plt.subplot(212)
     plt.plot(ensemble.frequency, ensemble.field1, 'g')
     plt.plot(ensemble.frequency, ensemble.field2, 'y')
+
     plt.show()

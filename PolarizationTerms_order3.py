@@ -1,5 +1,7 @@
-import numpy as np
+from mpl_toolkits.mplot3d import axes3d
 import matplotlib.pyplot as plt
+from matplotlib import cm
+import numpy as np
 from types import MethodType, FunctionType
 import numexpr as ne
 from itertools import permutations
@@ -170,8 +172,6 @@ class PolarizationTerms:
             }
         ) for _ in range(self.N_molecules)]
 
-        self.detection = self.w_excited_1 + self.w_excited_2 - self.w_excited_3
-
         self.frequency = np.linspace(
             self.w_excited_1 - self.freq_halfwidth,
             self.w_excited_1 + self.freq_halfwidth - 2*self.freq_halfwidth/self.N_frequency,
@@ -311,39 +311,64 @@ class PolarizationTerms:
             "sum((K * G / (2j * (conj(D) - conj(Q)) * (conj(Q) - E)))*((conj(Q) - R)/(conj(D) - Q)*(conj(D) - R) - H), axis=3)"
         ).sum(axis=(1, 2))
 
-    def calculate_total_pol3(self, **params):
-        return self.calculate_pol_a2(1, 2, 3, **params)
+    def calculate_total_pol3(self, permute, **params):
+        if permute == 1:
+            return sum(
+                (
+                    self.calculate_pol_a2(m, n, v, **params) +
+                    self.calculate_pol_b1(m, n, v, **params) +
+                    self.calculate_pol_c1(m, n, v, **params)
+                 ) for m, n, v in permutations([1, 2, 3])
+            )
+        else:
+            return self.calculate_pol_a2(1, 2, 3, **params)
 
-        # return sum(
-        #     (
-        #         self.calculate_pol_a2(m, n, v, **params) +
-        #         self.calculate_pol_b1(m, n, v, **params) +
-        #         self.calculate_pol_c1(m, n, v, **params)
-        #      ) for m, n, v in permutations([1, 2, 3])
-        # )
+    def calculate_chi_3(self, m, n, v, z, **params):
+        local_vars = vars(self).copy()
+        local_vars['pi'] = np.pi
+        local_vars['w_n0'] = params['w_' + str(n) + str(0)]
+        local_vars['w_vn'] = params['w_' + str(v) + str(n)]
+        local_vars['w_m0'] = params['w_' + str(m) + str(0)]
+        local_vars['g_n0'] = params['g_' + str(n) + str(0)]
+        local_vars['g_vn'] = params['g_' + str(v) + str(n)]
+        local_vars['g_m0'] = params['g_' + str(m) + str(0)]
+        f1 = self.frequency[:, np.newaxis]
+        f2 = self.frequency[np.newaxis, :]
+        f3 = z
+        local_vars['f1'] = f1
+        local_vars['f2'] = f2
+        local_vars['f3'] = f3
+
+        return ne.evaluate("1. / ((w_vn - 1j*g_vn - f1 - f2 - f3)*(w_m0 - 1j*g_m0 - f1 - f2)*(w_n0 - 1j*g_n0 - f1))", local_dict=local_vars)
 
 
 if __name__ == '__main__':
 
+    import time
+    import pickle
+    start = time.time()
     w_excited_1 = 0.6e-6
     w_excited_2 = 2.354
     w_excited_3 = 1.7e-6
+    detection = w_excited_1 + w_excited_2 - w_excited_3
 
-    ensemble = PolarizationTerms(
-        N_molecules=1,
+    parameters = dict(
+        N_molecules=3,
         N_order=5,
         N_order_energy=9,
-        N_comb=30,
-        N_frequency=500,
-        freq_halfwidth=2e-5,
+        N_comb=15,
+        N_frequency=2000,
+        freq_halfwidth=4.e-5,
 
         w_excited_1=w_excited_1,
         w_excited_2=w_excited_2,
         w_excited_3=w_excited_3,
 
-        omega_M1=w_excited_1 - 3.2e-7,
-        omega_M2=w_excited_1 - 6.4e-7,
-        omega_M3=w_excited_1 + 1.6e-7,
+        detection=detection,
+
+        omega_M1=-3.2e-7,
+        omega_M2=-6.4e-7,
+        omega_M3=0.8e-7,
 
         gamma=1e-9,
         omega_del_1=16e-7,
@@ -362,19 +387,70 @@ if __name__ == '__main__':
         g_spacing_23=0.30
     )
 
-    pol3_mat = np.asarray([ensemble.calculate_total_pol3(**m).real for m in ensemble.molecules])
-    # print pol3_mat[0]
+    ensemble = PolarizationTerms(**parameters)
+
+    pol3_mat = np.asarray([ensemble.calculate_total_pol3(permute=1, **m).real for m in ensemble.molecules])
     factor = np.abs(pol3_mat).max() / np.abs(ensemble.field1.max())
     pol3_mat /= factor
     plt.figure()
 
-    plt.plot(ensemble.frequency_detection, ensemble.field1, 'g')
-    plt.plot(ensemble.frequency_detection, ensemble.field2, 'y')
-    plt.plot(ensemble.frequency_detection, ensemble.field3, 'm')
+    plt.plot(ensemble.frequency, ensemble.field1, 'g')
+    plt.plot(ensemble.frequency, ensemble.field2, 'y')
+    plt.plot(ensemble.frequency, ensemble.field3, 'm')
 
-    plt.plot(ensemble.frequency_detection, np.abs(pol3_mat[0]), 'r')
-    # plt.plot(ensemble.frequency_detection, np.abs(pol3_mat[1]), 'b')
-    # plt.plot(ensemble.frequency_detection, np.abs(pol3_mat[2]), 'k')
+    plt.plot(ensemble.frequency, pol3_mat[0], 'r')
+    plt.plot(ensemble.frequency, pol3_mat[1], 'b')
+    plt.plot(ensemble.frequency, pol3_mat[2], 'k')
     plt.ylabel("Polarizations (arbitrary units)")
     plt.xlabel("Frequency (in fs$^{-1}$)")
+    colors = ['r', 'k', 'b']
+    plt.figure()
+    [(plt.subplot(311+i), plt.plot(ensemble.frequency, pol3_mat[i], color=colors[i])) for i in range(ensemble.N_molecules)]
+
+    with open("Polarization_order3_data.pickle", "wb") as output_file:
+        pickle.dump(
+            {
+                "frequency": ensemble.frequency,
+                "molecules_pol3": pol3_mat,
+                "field1": ensemble.field1,
+                "field2": ensemble.field2,
+                "field3": ensemble.field3,
+                'params': {
+                    'N_molecules': ensemble.N_molecules,
+                    'N_order': ensemble.N_order,
+                    'N_order_energy': ensemble.N_order_energy,
+                    'N_comb': ensemble.N_comb,
+                    'N_frequency': ensemble.N_frequency,
+                    'freq_halfwidth': ensemble.freq_halfwidth,
+
+                    'w_excited_1': ensemble.w_excited_1,
+                    'w_excited_': ensemble.w_excited_2,
+                    'w_excited_3': ensemble.w_excited_3,
+
+                    'detection': ensemble.detection,
+
+                    'omega_M1': ensemble.omega_M1,
+                    'omega_M2': ensemble.omega_M2,
+                    'omega_M3': ensemble.omega_M3,
+                    'gamma': ensemble.gamma,
+
+                    'omega_del_1': ensemble.omega_del_1,
+                    'omega_del_2': ensemble.omega_del_2,
+                    'omega_del_3': ensemble.omega_del_3,
+
+                    'w_spacing_10': ensemble.w_spacing_10,
+                    'w_spacing_20': ensemble.w_spacing_20,
+                    'w_spacing_30': ensemble.w_spacing_30,
+
+                    'g_spacing_10': ensemble.g_spacing_10,
+                    'g_spacing_20': ensemble.g_spacing_20,
+                    'g_spacing_30': ensemble.g_spacing_30,
+                    'g_spacing_12': ensemble.g_spacing_12,
+                    'g_spacing_13': ensemble.g_spacing_13,
+                    'g_spacing_23': ensemble.g_spacing_23
+                }
+            }, output_file
+        )
+    print time.time() - start
     plt.show()
+
