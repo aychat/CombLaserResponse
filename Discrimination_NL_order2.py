@@ -123,7 +123,7 @@ class FrequencyComb(PolarizationTerms):
         except AttributeError:
             raise AttributeError("Molecule gamma_12 increments not specified")
 
-        self.pol2_freq_matrix = np.asarray([self.calculate_total_pol(**instance) for instance in self.molecules]).T.real
+        self.pol2_freq_matrix = np.asarray([self.calculate_total_pol(**instance) for instance in self.molecules]).T
         # self.pol2_freq_matrix /= np.abs(self.pol2_freq_matrix).max()
 
     def heterodyne_fields_frequency_basis(self, k):
@@ -134,7 +134,7 @@ class FrequencyComb(PolarizationTerms):
         POLARIZATION MATRIX DUE ALL BUT THE k_th POLARIZATIONS
         """
         return np.delete(
-            np.linalg.qr(np.delete(self.pol2_freq_matrix.real, k, 1), mode='complete')[0],
+            np.linalg.qr(np.delete(self.pol2_freq_matrix, k, 1), mode='complete')[0],
             np.s_[:self.N_molecules-1],
             1
         )
@@ -153,7 +153,7 @@ class FrequencyComb(PolarizationTerms):
         )
         self.freq2comb_basis /= self.freq2comb_basis.max()
         assert self.freq2comb_basis.shape == (self.N_frequency, 4*self.N_comb), "Mismatching dims for basis-change matrix"
-        self.pol2_comb_matrix = self.freq2comb_basis.T.dot(self.pol2_freq_matrix.real)
+        self.pol2_comb_matrix = self.freq2comb_basis.T.dot(self.pol2_freq_matrix)
         return self.pol2_comb_matrix
 
     def heterodyne_fields_comb_basis(self, k):
@@ -168,7 +168,7 @@ class FrequencyComb(PolarizationTerms):
         except:
             self.pol2_basis_change_freq2comb()
 
-        return np.delete(np.linalg.qr(np.delete(self.pol2_comb_matrix.real, k, 1), mode='complete')[0], np.s_[:self.N_molecules-1], 1)
+        return np.delete(np.linalg.qr(np.delete(self.pol2_comb_matrix, k, 1), mode='complete')[0], np.s_[:self.N_molecules-1], 1)
 
 
 if __name__ == '__main__':
@@ -207,11 +207,17 @@ if __name__ == '__main__':
     cmap = plt.get_cmap('jet')
     colors = cmap(np.linspace(0, 1.0, 4*ensemble.N_comb))
 
+    colors = ['b', 'r', 'k']
     plt.subplot(211)
-    [plt.plot(ensemble.frequency, ensemble.freq2comb_basis[:, i], color=colors[i]) for i in range(4*ensemble.N_comb)]
+    plt.plot(ensemble.frequency, ensemble.field1 / (ensemble.field1.max()), 'g')
+    plt.plot(ensemble.frequency, ensemble.field2 / (ensemble.field1.max()), 'y')
+    [plt.plot(ensemble.frequency, ensemble.pol2_freq_matrix[:, i].real/np.abs(ensemble.pol2_freq_matrix).max(), color=colors[i]) for i in range(3)]
     plt.subplot(212)
-    plt.plot(ensemble.frequency, ensemble.freq2comb_basis.sum(axis=1))
-    plt.plot(ensemble.frequency, ensemble.pol2_freq_matrix/ensemble.pol2_freq_matrix.max())
+    plt.plot(ensemble.frequency, ensemble.field1 / (ensemble.field1.max()), 'g')
+    plt.plot(ensemble.frequency, ensemble.field2 / (ensemble.field1.max()), 'y')
+    [plt.plot(ensemble.frequency, ensemble.pol2_freq_matrix[:, i].imag/np.abs(ensemble.pol2_freq_matrix).max(), color=colors[i]) for i in range(3)]
+    plt.ylabel("Polarizations (arbitrary units)")
+    plt.xlabel("Frequency (in fs$^{-1}$)")
 
     P_f = ensemble.pol2_freq_matrix
     P_c = ensemble.pol2_comb_matrix
@@ -219,34 +225,31 @@ if __name__ == '__main__':
     P_f /= P_f.max()
     P_c /= P_c.max()
     CB /= CB.max()
-
-    print P_f.shape, P_f.max(), P_f.min()
-    print P_c.shape, P_c.max(), P_c.min()
-    print CB.shape, CB.max(), CB.min()
-
-    print np.allclose(P_c, CB.T.dot(P_f))
     Q_f, R_f = np.linalg.qr(P_f, mode='complete')
 
     def gaussian(x, x_0, sigma):
         return (1./(sigma*np.sqrt(np.pi)))*np.exp(-(x-x_0)**2/(2*sigma**2))
 
     colors1 = cm.Reds(np.linspace(0.5, 1, 3))
-    colors2 = cm.Blues(np.linspace(0.5, 1, 3))
-    f, ax = plt.subplots(2, 3, sharex=True, sharey=True)
+    colors2 = cm.Greens(np.linspace(0.5, 1, 3))
+    colors3 = cm.Blues(np.linspace(0.5, 1, 3))
+    f, ax = plt.subplots(3, 3, sharex=True, sharey=True)
     f.suptitle("$2^{nd}$ order non-linear polarization $P^{(2)}(\\omega)$ and corresponding \n heterodyne fields $E^{het}(\\omega)$ for 3 near-identical atomic systems")
     for i in range(ensemble.N_molecules):
         Q_c, R_c = np.linalg.qr(np.delete(P_c, i, 1), mode='complete')
         het_fields = Q_c[:, ensemble.N_molecules:]
-        ax[0, i].plot(ensemble.frequency, CB.dot(P_c[:, i]), color=colors1[i])
-        # ax[0, i].set_xlabel("Frequency (in $fs$)")
+        print het_fields.shape
+        ax[0, i].plot(ensemble.frequency, CB.dot(P_c[:, i]).real, color=colors1[i])
+        ax[1, i].plot(ensemble.frequency, CB.dot(P_c[:, i]).imag, color=colors2[i])
         G = gaussian(np.linspace(0., 1., het_fields.shape[1]), 0.5, .05)
         heterodyne = CB.dot(np.asarray([G[j] * het_fields[:, j] for j in range(het_fields.shape[1])]).sum(axis=0))
-        heterodyne /= heterodyne.max()
-        ax[1, i].plot(ensemble.frequency, heterodyne, color=colors2[i])
-        ax[1, i].set_xlabel("Frequency (in $fs$)")
-        print [heterodyne.dot(P_f[:, i]) for i in range(3)]
-    ax[0, 0].set_ylabel("Normalized Polarization \n $P^{(2)}(\\omega)$")
-    ax[1, 0].set_ylabel("Heterodyne fields \n $E^{het}(\\omega)$")
+        heterodyne /= np.abs(heterodyne).max()
+        ax[2, i].plot(ensemble.frequency, heterodyne, color=colors3[i])
+        ax[2, i].set_xlabel("Frequency (in $fs$)")
+        print np.asarray([np.vdot(heterodyne, P_f[:, j]) for j in range(3)])
+    ax[0, 0].set_ylabel("Normalized Polarization \n (Real part) \n $\mathcal{Re}[P^{(2)}(\\omega)]$")
+    ax[1, 0].set_ylabel("Normalized Polarization \n (Imaginary part) \n $\mathcal{Im}[P^{(2)}(\\omega)]$")
+    ax[2, 0].set_ylabel("Heterodyne fields \n $E^{het}(\\omega)$")
 
     for i in range(2):
         for j in range(3):

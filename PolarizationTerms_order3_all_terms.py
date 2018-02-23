@@ -92,14 +92,9 @@ class PolarizationTerms:
             raise AttributeError("Field line-width not specified")
 
         try:
-            self.omega_del_1
+            self.omega_del
         except AttributeError:
-            raise AttributeError("Frequency Comb spacing 1 not specified")
-
-        try:
-            self.omega_del_2
-        except AttributeError:
-            raise AttributeError("Frequency Comb spacing 2 not specified")
+            raise AttributeError("Frequency Comb spacing is not specified")
 
         try:
             self.w_spacing_10
@@ -139,6 +134,8 @@ class PolarizationTerms:
                 g_12=_ * self.g_spacing_12 * 10**(-self.N_order),
                 g_13=_ * self.g_spacing_13 * 10**(-self.N_order),
                 g_23=_ * self.g_spacing_23 * 10**(-self.N_order),
+                omega_M1=self.omega_M1,
+                omega_M2=self.omega_M2
             ) for _ in range(1, self.N_molecules+1)
         ]
 
@@ -184,14 +181,12 @@ class PolarizationTerms:
             self.N_frequency
         )
 
-        self.del_omega1 = self.omega_del_1 * np.arange(-self.N_comb, self.N_comb)
-        self.del_omega2 = self.omega_del_2 * np.arange(-self.N_comb, self.N_comb)
-        self.del_omega3 = self.omega_del_3 * np.arange(-self.N_comb, self.N_comb)
+        self.del_omega = self.omega_del * np.arange(-self.N_comb, self.N_comb)
 
         self.omega = self.frequency[:, np.newaxis, np.newaxis, np.newaxis]
-        self.comb_omega1 = self.del_omega1[np.newaxis, :, np.newaxis, np.newaxis]
-        self.comb_omega2 = self.del_omega2[np.newaxis, np.newaxis, :, np.newaxis]
-        self.comb_omega3 = self.del_omega3[np.newaxis, np.newaxis, np.newaxis, :]
+        self.comb_omega1 = self.del_omega[np.newaxis, :, np.newaxis, np.newaxis]
+        self.comb_omega2 = self.del_omega[np.newaxis, np.newaxis, :, np.newaxis]
+        self.comb_omega3 = self.del_omega[np.newaxis, np.newaxis, np.newaxis, :]
 
         self.field1 = ne.evaluate(
             "sum(gamma / ((omega - omega_M1 - comb_omega1)**2 + gamma**2), axis=3)",
@@ -201,12 +196,8 @@ class PolarizationTerms:
             "sum(gamma / ((omega - omega_M2 - comb_omega2)**2 + gamma**2), axis=3)",
             local_dict=vars(self)
         ).sum(axis=(1, 2))
-        self.field3 = ne.evaluate(
-            "sum(gamma / ((omega - omega_M3 - comb_omega3)**2 + gamma**2), axis=3)",
-            local_dict=vars(self)
-        ).sum(axis=(1, 2))
 
-    def calculate_pol_a2(self, m, n, v, **params):
+    def calculate_pol_a2(self, m, n, v, a, b, c, **params):
         """
         CALCULATES THE POLARIZATION DUE TO THE TERM (a2) OF THE SUSCEPTIBILITY TENSOR, INTERACTING WITH THE COMPONENTS
         E_1(omega_1) AND E_2(omega - omega_1) and E_1(omega - omega_1) AND E_2(omega_1)
@@ -226,13 +217,19 @@ class PolarizationTerms:
         local_vars['g_mv'] = params['g_'+str(m)+str(v)]
         local_vars['g_nv'] = params['g_'+str(n)+str(v)]
         local_vars['g_v0'] = params['g_'+str(v)+str(0)]
-        K = ne.evaluate("pi * gamma / (omega - omega_M3 - comb_omega3 - w_mv + 1j * (gamma + g_mv))", local_dict=local_vars)
-        Q = ne.evaluate("omega - omega_M2 - comb_omega2 - omega_M3 - comb_omega3 - 2j*gamma", local_dict=local_vars)
-        R = ne.evaluate("w_mv - omega_M2 - comb_omega2 - 1j*(gamma + g_mv)", local_dict=local_vars)
+        local_vars['omega_M1_lv'] = params['omega_M'+str(a)]
+        local_vars['omega_M2_lv'] = params['omega_M'+str(b)]
+        local_vars['omega_M3_lv'] = params['omega_M'+str(c)]
+
+        print a, b, c, local_vars['omega_M1_lv'], local_vars['omega_M2_lv'], local_vars['omega_M3_lv']
+
+        K = ne.evaluate("-pi * pi * gamma / (omega - omega_M3_lv - comb_omega3 - w_mv + 1j * (gamma + g_mv))", local_dict=local_vars)
+        Q = ne.evaluate("omega - omega_M2_lv - comb_omega2 - omega_M3_lv - comb_omega3 - 2j*gamma", local_dict=local_vars)
+        R = ne.evaluate("w_mv - omega_M2_lv - comb_omega2 - 1j*(gamma + g_mv)", local_dict=local_vars)
         G = ne.evaluate("1./(w_nv - omega - 1j*g_nv)", local_dict=local_vars)
-        D = ne.evaluate("omega_M1 + comb_omega1 -1j*gamma", local_dict=local_vars)
+        D = ne.evaluate("omega_M1_lv + comb_omega1 -1j*gamma", local_dict=local_vars)
         E = ne.evaluate("-w_v0 - 1j*g_v0", local_dict=local_vars)
-        delta = ne.evaluate("omega - omega_M1 - comb_omega1 - omega_M2 - comb_omega2 - omega_M3 - comb_omega3", local_dict=local_vars)
+        delta = ne.evaluate("omega - omega_M1_lv - comb_omega1 - omega_M2_lv - comb_omega2 - omega_M3_lv - comb_omega3", local_dict=local_vars)
         local_vars['delta'] = delta
         H = ne.evaluate("delta/(delta**2+9*gamma**2)", local_dict=local_vars)
 
@@ -240,7 +237,7 @@ class PolarizationTerms:
             "sum((K * G / (2j * (conj(D) - conj(Q)) * (conj(Q) - E)))*((conj(Q) - R)/(conj(D) - Q)*(conj(D) - R) - H), axis=3)"
         ).sum(axis=(1, 2))
 
-    def calculate_pol_b1(self, m, n, v, **params):
+    def calculate_pol_b1(self, m, n, v, a, b, c, **params):
         """
         CALCULATES THE POLARIZATION DUE TO THE TERM (b1) OF THE SUSCEPTIBILITY TENSOR, INTERACTING WITH THE COMPONENTS
         E_1(omega_1) AND E_2(omega - omega_1) and E_1(omega - omega_1) AND E_2(omega_1)
@@ -260,21 +257,27 @@ class PolarizationTerms:
         local_vars['g_vm'] = params['g_' + str(v) + str(m)]
         local_vars['g_nv'] = params['g_' + str(n) + str(v)]
         local_vars['g_m0'] = params['g_' + str(m) + str(0)]
-        K = ne.evaluate("pi * gamma / (omega - omega_M3 - comb_omega3 + w_vm + 1j * (gamma - g_vm))",
+        local_vars['omega_M1_lv'] = params['omega_M'+str(a)]
+        local_vars['omega_M2_lv'] = params['omega_M'+str(b)]
+        local_vars['omega_M3_lv'] = params['omega_M'+str(c)]
+
+        print a, b, c, local_vars['omega_M1_lv'], local_vars['omega_M2_lv'], local_vars['omega_M3_lv']
+
+        K = ne.evaluate("-pi * pi * gamma / (omega - omega_M3_lv - comb_omega3 + w_vm + 1j * (gamma - g_vm))",
                         local_dict=local_vars)
-        Q = ne.evaluate("omega - omega_M2 - comb_omega2 - omega_M3 - comb_omega3 - 2j*gamma", local_dict=local_vars)
-        R = ne.evaluate("-w_vm - omega_M2 - comb_omega2 - 1j*(gamma - g_vm)", local_dict=local_vars)
+        Q = ne.evaluate("omega - omega_M2_lv - comb_omega2 - omega_M3_lv - comb_omega3 - 2j*gamma", local_dict=local_vars)
+        R = ne.evaluate("-w_vm - omega_M2_lv - comb_omega2 - 1j*(gamma - g_vm)", local_dict=local_vars)
         G = ne.evaluate("1./(w_nv - omega - 1j*g_nv)", local_dict=local_vars)
-        D = ne.evaluate("omega_M1 + comb_omega1 -1j*gamma", local_dict=local_vars)
+        D = ne.evaluate("omega_M1_lv + comb_omega1 -1j*gamma", local_dict=local_vars)
         E = ne.evaluate("w_m0 - 1j*g_m0", local_dict=local_vars)
-        delta = ne.evaluate("omega - omega_M1 - comb_omega1 - omega_M2 - comb_omega2 - omega_M3 - comb_omega3", local_dict=local_vars)
+        delta = ne.evaluate("omega - omega_M1_lv - comb_omega1 - omega_M2_lv - comb_omega2 - omega_M3_lv - comb_omega3", local_dict=local_vars)
         local_vars['delta'] = delta
         H = ne.evaluate("delta/(delta**2+9*gamma**2)", local_dict=local_vars)
         return ne.evaluate(
             "sum((K * G / (2j * (conj(D) - conj(Q)) * (conj(Q) - E)))*((conj(Q) - R)/(conj(D) - Q)*(conj(D) - R) - H), axis=3)"
         ).sum(axis=(1, 2))
 
-    def calculate_pol_c1(self, m, n, v, **params):
+    def calculate_pol_c1(self, m, n, v, a, b, c, **params):
         """
         CALCULATES THE POLARIZATION DUE TO THE TERM (c1) OF THE SUSCEPTIBILITY TENSOR, INTERACTING WITH THE COMPONENTS
         E_1(omega_1) AND E_2(omega - omega_1) and E_1(omega - omega_1) AND E_2(omega_1)
@@ -294,34 +297,38 @@ class PolarizationTerms:
         local_vars['g_n0'] = params['g_' + str(n) + str(0)]
         local_vars['g_vn'] = params['g_' + str(v) + str(n)]
         local_vars['g_m0'] = params['g_' + str(m) + str(0)]
+        local_vars['omega_M1_lv'] = params['omega_M'+str(a)]
+        local_vars['omega_M2_lv'] = params['omega_M'+str(b)]
+        local_vars['omega_M3_lv'] = params['omega_M'+str(c)]
 
-        K = ne.evaluate("pi * gamma / (omega - omega_M3 - comb_omega3 - w_n0 + 1j * (gamma + g_n0))",
+        print a, b, c, local_vars['omega_M1_lv'], local_vars['omega_M2_lv'], local_vars['omega_M3_lv']
+        K = ne.evaluate("-pi * pi * gamma / (omega - omega_M3_lv - comb_omega3 - w_n0 + 1j * (gamma + g_n0))",
                         local_dict=local_vars)
 
-        Q = ne.evaluate("omega - omega_M2 - comb_omega2 - omega_M3 - comb_omega3 - 2j*gamma", local_dict=local_vars)
-        R = ne.evaluate("w_n0 - omega_M2 - comb_omega2 - 1j*(gamma + g_n0)", local_dict=local_vars)
+        Q = ne.evaluate("omega - omega_M2_lv - comb_omega2 - omega_M3_lv - comb_omega3 - 2j*gamma", local_dict=local_vars)
+        R = ne.evaluate("w_n0 - omega_M2_lv - comb_omega2 - 1j*(gamma + g_n0)", local_dict=local_vars)
         G = ne.evaluate("1./(-w_vn - omega - 1j*g_vn)", local_dict=local_vars)
-        D = ne.evaluate("omega_M1 + comb_omega1 -1j*gamma", local_dict=local_vars)
+        D = ne.evaluate("omega_M1_lv + comb_omega1 -1j*gamma", local_dict=local_vars)
         E = ne.evaluate("w_m0 - 1j*g_m0", local_dict=local_vars)
-        delta = ne.evaluate("omega - omega_M1 - comb_omega1 - omega_M2 - comb_omega2 - omega_M3 - comb_omega3",
+        delta = ne.evaluate("omega - omega_M1_lv - comb_omega1 - omega_M2_lv - comb_omega2 - omega_M3_lv - comb_omega3",
                             local_dict=local_vars)
         local_vars['delta'] = delta
-        H = ne.evaluate("pi*delta/(delta**2+9*gamma**2)", local_dict=local_vars)
+        H = ne.evaluate("delta/(delta**2+9*gamma**2)", local_dict=local_vars)
         return ne.evaluate(
             "sum((K * G / (2j * (conj(D) - conj(Q)) * (conj(Q) - E)))*((conj(Q) - R)/(conj(D) - Q)*(conj(D) - R) - H), axis=3)"
         ).sum(axis=(1, 2))
 
-    def calculate_total_pol3(self, permute, **params):
+    def calculate_total_pol3(self, a, b, c, permute, **params):
         if permute == 1:
             return sum(
                 (
-                    self.calculate_pol_a2(m, n, v, **params)
-                    # self.calculate_pol_b1(m, n, v, **params) +
-                    # self.calculate_pol_c1(m, n, v, **params)
+                    self.calculate_pol_a2(m, n, v, a, b, c, **params) +
+                    self.calculate_pol_b1(m, n, v, a, b, c, **params) +
+                    self.calculate_pol_c1(m, n, v, a, b, c, **params)
                  ) for m, n, v in permutations([1, 2, 3])
             )
         else:
-            return self.calculate_pol_a2(1, 2, 3, **params)
+            return self.calculate_pol_a2(1, 2, 3, a, b, c, **params)
 
     def calculate_chi_3(self, m, n, v, z, **params):
         local_vars = vars(self).copy()
@@ -356,8 +363,8 @@ if __name__ == '__main__':
         N_molecules=1,
         N_order=5,
         N_order_energy=9,
-        N_comb=20,
-        N_frequency=500,
+        N_comb=10,
+        N_frequency=5000,
         freq_halfwidth=4.e-5,
 
         w_excited_1=w_excited_1,
@@ -368,16 +375,13 @@ if __name__ == '__main__':
 
         omega_M1=-3.2e-7,
         omega_M2=-6.4e-7,
-        omega_M3=0.8e-7,
 
         gamma=1e-9,
-        omega_del_1=16e-7,
-        omega_del_2=16e-7,
-        omega_del_3=16e-7,
+        omega_del=2.*16e-7,
 
-        w_spacing_10=0.50,
-        w_spacing_20=0.65,
-        w_spacing_30=0.80,
+        w_spacing_10=2.*0.50,
+        w_spacing_20=2.*0.65,
+        w_spacing_30=2.*0.80,
 
         g_spacing_10=0.45,
         g_spacing_20=0.35,
@@ -389,36 +393,54 @@ if __name__ == '__main__':
 
     ensemble = PolarizationTerms(**parameters)
 
-    pol3_mat = np.asarray([ensemble.calculate_total_pol3(permute=0, **m) for m in ensemble.molecules])
-    factor = np.abs(pol3_mat).max() / np.abs(ensemble.field1.max())
-    pol3_mat /= factor
-    plt.figure()
+    # pol3_mat = np.asarray([
+    #     (
+    #         ensemble.calculate_total_pol3(1, 1, 1, permute=0, **m)
+    #         + ensemble.calculate_total_pol3(1, 1, 2, permute=0, **m)
+    #         + ensemble.calculate_total_pol3(1, 2, 1, permute=0, **m)
+    #         + ensemble.calculate_total_pol3(1, 2, 2, permute=0, **m)
+    #         + ensemble.calculate_total_pol3(2, 1, 1, permute=0, **m)
+    #         + ensemble.calculate_total_pol3(2, 1, 2, permute=0, **m)
+    #         + ensemble.calculate_total_pol3(2, 2, 1, permute=0, **m)
+    #         + ensemble.calculate_total_pol3(2, 2, 2, permute=0, **m)
+    #                         ) for m in ensemble.molecules])
+    # factor = np.abs(pol3_mat).max() / np.abs(ensemble.field1.max())
+    # pol3_mat /= factor
 
-    plt.plot(ensemble.frequency, ensemble.field1, 'g')
-    plt.plot(ensemble.frequency, ensemble.field2, 'y')
-    # plt.plot(ensemble.frequency, ensemble.field3, 'm')
-    #
-    plt.plot(ensemble.frequency, pol3_mat[0], 'r')
-    # plt.plot(ensemble.frequency, pol3_mat[1], 'b')
-    # plt.plot(ensemble.frequency, pol3_mat[2], 'k')
-    #
+    plt.figure()
+    plt.plot(ensemble.frequency, ensemble.field1/ensemble.field1.max(), 'g*-')
+    plt.plot(ensemble.frequency, ensemble.field2/ensemble.field1.max(), 'y*-')
+    factor = np.abs(ensemble.calculate_total_pol3(1, 1, 1, permute=0, **ensemble.molecules[0])).real.max()
+    print factor
+    plt.plot(ensemble.frequency, ensemble.calculate_total_pol3(1, 1, 1, permute=0, **ensemble.molecules[0]).real/factor, '*', label='$P^{(3)}_{111}$')
+    plt.plot(ensemble.frequency, ensemble.calculate_total_pol3(1, 1, 2, permute=0, **ensemble.molecules[0]).real/factor
+             + ensemble.calculate_total_pol3(1, 2, 1, permute=0, **ensemble.molecules[0]).real/factor
+             + ensemble.calculate_total_pol3(2, 1, 1, permute=0, **ensemble.molecules[0]).real/factor
+             , '*', label='$P^{(3)}_{211} + P^{(3)}_{121} + P^{(3)}_{112}$')
+    plt.plot(ensemble.frequency,
+             ensemble.calculate_total_pol3(2, 2, 1, permute=0, **ensemble.molecules[0]).real/factor
+             + ensemble.calculate_total_pol3(2, 1, 2, permute=0, **ensemble.molecules[0]).real/factor
+             + ensemble.calculate_total_pol3(1, 2, 2, permute=0, **ensemble.molecules[0]).real/factor
+             , '*', label='$P^{(3)}_{221} + P^{(3)}_{212} + P^{(3)}_{122}$')
+    plt.plot(ensemble.frequency, ensemble.calculate_total_pol3(2, 2, 2, permute=0, **ensemble.molecules[0]).real/factor, '*', label='$P^{(3)}_{222}$')
+    plt.legend()
+    # plt.plot(pol3_mat.real[0])
     plt.ylabel("Polarizations (arbitrary units)")
     plt.xlabel("Frequency (in fs$^{-1}$)")
     colors = ['r', 'k', 'b']
-    plt.figure()
-    [plt.plot(ensemble.frequency, pol3_mat[i], color=colors[i]) for i in range(ensemble.N_molecules)]
+    # plt.figure()
+    # [(plt.subplot(311+i), plt.plot(ensemble.frequency, pol3_mat[i], color=colors[i])) for i in range(ensemble.N_molecules)]
 
-    with open("Polarization_order3_data.pickle", "wb") as output_file:
-        pickle.dump(
-            {
-                "frequency": ensemble.frequency,
-                "molecules_pol3": pol3_mat,
-                "field1": ensemble.field1,
-                "field2": ensemble.field2,
-                "field3": ensemble.field3,
-                'params': parameters
-            }, output_file
-        )
+    # with open("Polarization_order3_data.pickle", "wb") as output_file:
+    #     pickle.dump(
+    #         {
+    #             "frequency": ensemble.frequency,
+    #             "molecules_pol3": pol3_mat,
+    #             "field1": ensemble.field1,
+    #             "field2": ensemble.field2,
+    #             'params': parameters
+    #         }, output_file
+    #     )
     print time.time() - start
     plt.show()
 
