@@ -363,8 +363,8 @@ if __name__ == '__main__':
         N_molecules=1,
         N_order=5,
         N_order_energy=9,
-        N_comb=10,
-        N_frequency=5000,
+        N_comb=20,
+        N_frequency=2000,
         freq_halfwidth=4.e-5,
 
         w_excited_1=w_excited_1,
@@ -408,21 +408,21 @@ if __name__ == '__main__':
     # pol3_mat /= factor
 
     plt.figure()
-    plt.plot(ensemble.frequency, ensemble.field1/ensemble.field1.max(), 'g*-')
-    plt.plot(ensemble.frequency, ensemble.field2/ensemble.field1.max(), 'y*-')
-    factor = np.abs(ensemble.calculate_total_pol3(1, 1, 1, permute=0, **ensemble.molecules[0])).real.max()
+    plt.plot(ensemble.frequency, ensemble.field1/ensemble.field1.max(), 'g')
+    plt.plot(ensemble.frequency, ensemble.field2/ensemble.field1.max(), 'y')
+    factor = 3.*np.abs(ensemble.calculate_total_pol3(1, 1, 1, permute=0, **ensemble.molecules[0])).real.max()
     print factor
-    plt.plot(ensemble.frequency, ensemble.calculate_total_pol3(1, 1, 1, permute=0, **ensemble.molecules[0]).real/factor, '*', label='$P^{(3)}_{111}$')
+    plt.plot(ensemble.frequency, ensemble.calculate_total_pol3(1, 1, 1, permute=0, **ensemble.molecules[0]).real/factor, label='$P^{(3)}_{111}$')
     plt.plot(ensemble.frequency, ensemble.calculate_total_pol3(1, 1, 2, permute=0, **ensemble.molecules[0]).real/factor
              + ensemble.calculate_total_pol3(1, 2, 1, permute=0, **ensemble.molecules[0]).real/factor
              + ensemble.calculate_total_pol3(2, 1, 1, permute=0, **ensemble.molecules[0]).real/factor
-             , '*', label='$P^{(3)}_{211} + P^{(3)}_{121} + P^{(3)}_{112}$')
+             , label='$P^{(3)}_{211} + P^{(3)}_{121} + P^{(3)}_{112}$')
     plt.plot(ensemble.frequency,
              ensemble.calculate_total_pol3(2, 2, 1, permute=0, **ensemble.molecules[0]).real/factor
              + ensemble.calculate_total_pol3(2, 1, 2, permute=0, **ensemble.molecules[0]).real/factor
              + ensemble.calculate_total_pol3(1, 2, 2, permute=0, **ensemble.molecules[0]).real/factor
-             , '*', label='$P^{(3)}_{221} + P^{(3)}_{212} + P^{(3)}_{122}$')
-    plt.plot(ensemble.frequency, ensemble.calculate_total_pol3(2, 2, 2, permute=0, **ensemble.molecules[0]).real/factor, '*', label='$P^{(3)}_{222}$')
+             , label='$P^{(3)}_{221} + P^{(3)}_{212} + P^{(3)}_{122}$')
+    plt.plot(ensemble.frequency, ensemble.calculate_total_pol3(2, 2, 2, permute=0, **ensemble.molecules[0]).real/factor, label='$P^{(3)}_{222}$')
     plt.legend()
     # plt.plot(pol3_mat.real[0])
     plt.ylabel("Polarizations (arbitrary units)")

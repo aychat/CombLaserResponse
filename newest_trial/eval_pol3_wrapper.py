@@ -32,10 +32,9 @@ except OSError:
 ############################################################################################
 
 lib.pol3.argtypes = (
-    POINTER(c_complex), # cmplx* out, # Array to save the polarizability for A1 diagram
+    POINTER(c_complex), # cmplx* out, # Array to save the polarizability
+    POINTER(c_double),  # double* freq, frequency arrays
     c_int,      # const int freq_size,
-    c_double,   # const double freq_min,
-    c_double,   # const double freq_max, // Frequency array
     c_int,      # const int comb_size,
     c_double,   # const double delta_freq,
     c_double,   # const double gamma,
@@ -49,12 +48,11 @@ lib.pol3.argtypes = (
 lib.pol3.restype = None
 
 
-def pol3(out, params, M_field1, M_field2, M_field3, wg_nv, wg_mv, wg_vl):
+def pol3(out, freq, params, M_field1, M_field2, M_field3, wg_nv, wg_mv, wg_vl):
     return lib.pol3(
         out.ctypes.data_as(POINTER(c_complex)),
-        out.size,
-        params.central_freq - params.freq_halfwidth,
-        params.central_freq + params.freq_halfwidth,
+        freq.ctypes.data_as(POINTER(c_double)),
+        freq.size,
         params.comb_size,
         params.delta_freq,
         params.gamma,

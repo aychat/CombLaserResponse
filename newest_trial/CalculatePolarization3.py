@@ -29,17 +29,27 @@ CTransition = namedtuple("CTransition", ["g", "mu"])
 ############################################################################################
 
 
+def frequency_range(params):
+    return np.linspace(
+        params.central_freq - params.freq_halfwidth,
+        params.central_freq + params.freq_halfwidth - 2.*params.freq_halfwidth/params.N_frequency,
+        params.N_frequency
+    )
+
 def get_polarization3(molecule, params):
     """
     Return the third order polarization for a specified molecule 
     :param molecule: an instance of ADict describing molecule 
     :param params: an instance of ADict specifying calculation parameters
-    :return: numpy.array containing polarization
+    :return: numpy.array, numpy.array (frequency, polarization)
     """
 
     # introducing aliases
     transition = molecule.transitions
     energy = molecule.energies
+
+    # generate the frequency range
+    freq = frequency_range(params)
 
     # initialize output array with zeros
     polarization = np.zeros(params.N_frequency, dtype=np.complex)
@@ -53,7 +63,7 @@ def get_polarization3(molecule, params):
 
             for M_field1, M_field2, M_field3 in product(*(3 * [[params.omega_M1, params.omega_M2]])):
                 pol3(
-                    polarization_mnv, params,
+                    polarization_mnv, freq, params,
                     M_field1, M_field2, M_field3,
                     energy[n] - energy[v] + 1j * transition[(n, v)].g,
                     energy[m] - energy[v] + 1j * transition[(m, v)].g,
@@ -66,7 +76,7 @@ def get_polarization3(molecule, params):
             # Not allowed transition, this diagram is not calculated
             pass
 
-    return polarization
+    return freq, polarization
 
 ############################################################################################
 #
@@ -107,45 +117,29 @@ if __name__ == '__main__':
     params = ADict(
         comb_size=20,
         N_frequency=2000,
-        freq_halfwidth=4.e-5,
-        central_freq=E_10,
-        omega_M1=-3.2e-7,
-        omega_M2=-6.4e-7,
+        freq_halfwidth=1.e-4,
+        central_freq=0.,
+        omega_M1=-1e-6,
+        omega_M2=-3e-6,
         gamma=1e-9,
-        delta_freq=2. * 16e-7,
+        delta_freq=4e-6,
     )
 
-    frequency = np.linspace(
-        params.central_freq - params.freq_halfwidth,
-        params.central_freq + params.freq_halfwidth,
-        params.N_frequency
-    )
+    frequency, pol3 = get_polarization3(molecule, params)
 
+    omega = frequency[:, np.newaxis]
+    comb_omega = (params.delta_freq * np.arange(-params.comb_size, params.comb_size))[np.newaxis, :]
+    field1 = (params.gamma / ((omega - params.omega_M1 - comb_omega)**2 + params.gamma**2)).sum(axis=1)
+    field2 = (params.gamma / ((omega - params.omega_M2 - comb_omega)**2 + params.gamma**2)).sum(axis=1)
+
+    print pol3.max(), field1.max()
     plt.figure()
+    #import time
+    #t0 = time.time()
 
-    import time
-    t0 = time.time()
-
-    plt.plot(frequency, get_polarization3(molecule, params), '*-')
-
-    print("Running time: {:.1f} sec".format(time.time() - t0))
-
+    plt.plot(frequency, field1, 'b')
+    plt.plot(frequency, field2, 'r')
+    plt.plot(frequency, pol3/(pol3.max()/field1.max()), 'k')
+    #print("Running time: {:.1f} sec".format(time.time() - t0))
     plt.show()
-
-# class CMolecule(Structure):
-#     _fields_ = [
-#         ("NE", c_int),   # the number of levels
-#         ("E", POINTER(c_double)), # Array of energy levels
-#
-#         ("Nt", c_int), # the number of transitions
-#         ("transitions", POINTER(Transition)), # Array of transitions
-#     ]
-#
-# class Transition(Structure):
-#     _fields_ = [
-#         ("i", c_int),  # the level number i
-#         ("j", c_int),  # the level number j
-#         ("g", c_double),  # the linewidth g_ij
-#         ("mu", c_double),  # the dipole moment mu_ij
-#     ]
 

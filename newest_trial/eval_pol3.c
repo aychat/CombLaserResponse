@@ -7,7 +7,7 @@ typedef double complex cmplx;
 
 void pol3(
     cmplx* out, // Array to save the polarizability
-    const int freq_size, const double freq_min, const double freq_max, // Frequency array
+    const double* freq, const int freq_size, // Frequency array
     const int comb_size, const double delta_freq,
     const double gamma, const double M_field1, const double M_field2, const double M_field3, // Comb parameters
     const cmplx wg_nv, const cmplx wg_mv, const cmplx wg_vl // omega_{ij} + I * gamma_{ij} for each transition from i to j
@@ -16,7 +16,7 @@ void pol3(
     #pragma omp parallel for
     for(int out_i = 0; out_i < freq_size; out_i++)
     {
-        const double omega = freq_min + out_i * (freq_max - freq_min) / (freq_size - 1);
+        const double omega = freq[out_i];
 
         cmplx result = 0. + 0. * I;
 

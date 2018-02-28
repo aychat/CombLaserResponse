@@ -96,17 +96,6 @@ class PolarizationTerms:
             local_dict=vars(self)
         ).sum(axis=(1, 2))
 
-# x = np.linspace(-10, 10, 300)
-# H = np.linspace(-5, 5, 10)
-
-######################################################################
-#
-#   Perform the same evaluation using C shared library
-#
-#   Note: You must compile the C shared library
-#       gcc -O3 -shared -o fastest_evaluate.so fastest_evaluate.c -lm -fopenmp
-#
-######################################################################
 
 if __name__ == '__main__':
 
@@ -155,35 +144,22 @@ if __name__ == '__main__':
 
     ensemble = PolarizationTerms(**parameters)
 
-    class MoleculeParams(ctypes.Structure):
-        _fields_ = [(k, ctypes.c_double) for k, v in ensemble.molecules[0].items()]
 
-    print(os.getcwd() + "/fastest_evaluate.so")
 
-    # Load the shared library assuming that it is in the same directory
-    lib = ctypes.cdll.LoadLibrary(os.getcwd() + "/fastest_evaluate.so")
-
-    # specify the parameters of the c-function
-    c_calc_pol3_a2 = lib.eval
-    c_calc_pol3_a2.argtypes = (
-        ctypes.POINTER(ctypes.c_double),        # double* out_r
-        ctypes.POINTER(ctypes.c_double),        # double* out_i
-        ctypes.c_int,                           # int size_out
-        ctypes.POINTER(ctypes.c_int),           # int* index
-        ctypes.c_int,                           # int x_num
-        ctypes.c_double,                        # double x_min
-        ctypes.c_double,                        # double x_max
-        ctypes.c_double,                        # double h_min
-        ctypes.c_double,                        # double h_max
-        ctypes.POINTER(MoleculeParams),  # struct params
-    )
-    c_calc_pol3_a2.restype = ctypes.c_int
 
     result_c_r = np.zeros_like(ensemble.frequency)
     result_c_i = np.zeros_like(ensemble.frequency)
     index = np.array([1, 2, 2])
     t0 = time.time()
 
+    class MoleculeParams(ctypes.Structure):
+        _fields_ = [(_, ctypes.c_double) for _ in ensemble.molecules[0]]
+
+    c_molecules = [MoleculeParams(**mol) for mol in ensemble.molecules]
+
+
+
+    """
     for i in range(1):
         molecule = MoleculeParams()
         molecule.w_21 = ensemble.molecules[i]['w_21']
@@ -213,7 +189,9 @@ if __name__ == '__main__':
         molecule.g_23 = ensemble.molecules[i]['g_23']
         molecule.omega_M2 = ensemble.molecules[i]['omega_M2']
         molecule.gamma = ensemble.gamma
+    """
 
+    """
     c_calc_pol3_a2(
         result_c_r.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
         result_c_i.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
@@ -226,9 +204,11 @@ if __name__ == '__main__':
         ensemble.frequency.max(),
         molecule
     )
+    
 
     print result_c_r
     print
     print result_c_i
 
     print("running C-library time: {} seconds".format(time.time() - t0))
+    """
