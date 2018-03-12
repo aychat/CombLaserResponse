@@ -48,11 +48,11 @@ lib.pol3.argtypes = (
 lib.pol3.restype = None
 
 
-def pol3(out, freq, params, M_field1, M_field2, M_field3, wg_nv, wg_mv, wg_vl):
+def pol3(out, params, M_field1, M_field2, M_field3, wg_nv, wg_mv, wg_vl):
     return lib.pol3(
         out.ctypes.data_as(POINTER(c_complex)),
-        freq.ctypes.data_as(POINTER(c_double)),
-        freq.size,
+        params.freq.ctypes.data_as(POINTER(c_double)),
+        out.size,
         params.comb_size,
         params.delta_freq,
         params.gamma,

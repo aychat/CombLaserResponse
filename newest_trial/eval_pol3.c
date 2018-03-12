@@ -27,19 +27,14 @@ void pol3(
             const cmplx term_P = M_field1 + p * delta_freq - gamma * I;
             for(int q = -comb_size; q < comb_size; q++)
             {
-                const cmplx term_B = omega - M_field2 - q*delta_freq + gamma * I - conj(wg_mv),
-                            term_R = conj(wg_mv) - M_field2 - q * delta_freq - gamma * I;
+                const cmplx term_R = conj(wg_mv) - M_field2 - q * delta_freq - gamma * I;
                 for(int r = -comb_size; r < comb_size; r++)
                 {
                     const cmplx term_Q = omega - M_field2 - M_field3 - (q + r) * delta_freq - 2. * gamma * I,
                                 term_s = omega - M_field1 - M_field2 - M_field3 - (p + q + r) * delta_freq,
-                                term_W = -2. * term_s / (pow(term_s, 2) + 9.*pow(gamma, 2));
+                                term_W = -2. * term_s / (pow(term_s, 2) + 9.*pow(gamma, 2)),
+                                term_B = omega - M_field3 - r*delta_freq + gamma * I - conj(wg_mv);
 
-                    //////////////////////////////////////////////////////////////////////////////////////////////
-                    //
-                    // A2 diagram
-                    //
-                    /////////////////////////////////////////////////////////////////////////////////////////////
                     result += (term_W + (conj(term_Q)-term_R)/((conj(term_P) - term_Q)*(conj(term_P) - term_R)))/
                             (term_A*term_B*(conj(term_P) - conj(term_Q))*(conj(term_Q) + wg_vl));
                 }
@@ -47,7 +42,7 @@ void pol3(
             }
         }
 
-        out[out_i] = result;
+        out[out_i] += result;
     }
 
 }
