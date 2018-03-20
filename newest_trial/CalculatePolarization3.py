@@ -2,7 +2,7 @@ from itertools import permutations, product, combinations_with_replacement
 from collections import namedtuple
 from ctypes import Structure, c_double, c_int, POINTER, Array
 
-from eval_pol3_wrapper import pol3
+from eval_pol3_wrapper import pol3_new
 
 ############################################################################################
 #                                                                                          #
@@ -121,10 +121,10 @@ def get_polarization3(molecule, params):
             # reset the polarization because C-code performs "+="
             polarization_mnv[:] = 0.
 
-            for M_field1, M_field2, M_field3 in product(*(3 * [[params.omega_M1, params.omega_M2]])):
-                pol3(
+            for M_field_h, M_field_i, M_field_j in product(*(3 * [[params.omega_M1, params.omega_M2]])):
+                pol3_new(
                     polarization_mnv, params,
-                    M_field1, M_field2, M_field3,
+                    M_field_h, M_field_i, M_field_j,
                     energy[n] - energy[v] + 1j * transition[(n, v)].g,
                     energy[m] - energy[v] + 1j * transition[(m, v)].g,
                     energy[v] - energy[0] + 1j * transition[(v, 0)].g
@@ -165,7 +165,7 @@ if __name__ == '__main__':
     E_10 = 0.6e-6
     E_21 = 2.354
     E_32 = 1.7e-6
-    central_freq = E_10
+    central_freq = E_10 + E_21 - E_32
 
     molecule = ADict(
 
@@ -189,12 +189,12 @@ if __name__ == '__main__':
     )
 
     params = ADict(
-        N_frequency=2000,
+        N_frequency=500,
         comb_size=20,
         freq_halfwidth=5.e-5,
         central_freq=central_freq,
-        omega_M1=-1e-6,
-        omega_M2=-3e-6,
+        omega_M1=central_freq-1e-6,
+        omega_M2=central_freq-3e-6,
         gamma=1e-9,
         delta_freq=2.5e-6,
     )

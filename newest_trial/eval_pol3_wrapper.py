@@ -31,7 +31,7 @@ except OSError:
 #
 ############################################################################################
 
-lib.pol3.argtypes = (
+lib.pol3_new.argtypes = (
     POINTER(c_complex), # cmplx* out, # Array to save the polarizability
     POINTER(c_double),  # double* freq, frequency arrays
     c_int,      # const int freq_size,
@@ -45,20 +45,20 @@ lib.pol3.argtypes = (
     c_complex,  # const cmplx wg_mv,
     c_complex   # const cmplx wg_vl // omega_{ij} + I * gamma_{ij} for each transition from i to j
 )
-lib.pol3.restype = None
+lib.pol3_new.restype = None
 
 
-def pol3(out, params, M_field1, M_field2, M_field3, wg_nv, wg_mv, wg_vl):
-    return lib.pol3(
+def pol3_new(out, params, M_field_h, M_field_i, M_field_j, wg_nv, wg_mv, wg_vl):
+    return lib.pol3_new(
         out.ctypes.data_as(POINTER(c_complex)),
         params.freq.ctypes.data_as(POINTER(c_double)),
         out.size,
         params.comb_size,
         params.delta_freq,
         params.gamma,
-        M_field1,
-        M_field2,
-        M_field3,
+        M_field_h,
+        M_field_i,
+        M_field_j,
         c_complex(wg_nv.real, wg_nv.imag),
         c_complex(wg_mv.real, wg_mv.imag),
         c_complex(wg_vl.real, wg_vl.imag)
