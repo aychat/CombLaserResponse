@@ -53,16 +53,20 @@ def nonuniform_frequency_range_3(params, freq_offset=None):
     """
     omega_M1 = params.omega_M1
     omega_M2 = params.omega_M2
+    omega_M3 = params.omega_M3
 
     # If freq_offset has not been specified, generate all unique third order combinations
     if not freq_offset:
         freq_offset = np.array([
-            sum(_) for _ in combinations_with_replacement([omega_M1, omega_M2, -omega_M1, -omega_M2], 3)
+            sum(_) for _ in combinations_with_replacement(
+                [omega_M1, omega_M2, omega_M3, -omega_M1, -omega_M2, -omega_M3], 3
+                # [omega_M1, omega_M2, -omega_M1, -omega_M2], 3
+            )
         ])
 
         # get number of digits to round to
         decimals = np.log10(np.abs(freq_offset[np.nonzero(freq_offset)]).min())
-        decimals = int(np.ceil(abs(decimals))) + 3
+        decimals = int(np.ceil(abs(decimals))) + 4
 
         # round of
         np.round(freq_offset, decimals, out=freq_offset)
@@ -71,11 +75,12 @@ def nonuniform_frequency_range_3(params, freq_offset=None):
         print freq_offset
 
     # def points_for_lorentzian(mean):
-    #     L = np.array([0, 0.02, 0.05, 0.1, 0.2, 0.4, 0.5, 1.])
+    #     # L = np.array([0, 0.02, 0.05, 0.1, 0.2, 0.4, 0.5, 1.])
+    #     L = np.array([0, 0.05, 0.4, 1.])
     #     L = np.append(-L[::-1], L[1::])
     #
     #     return mean + 4. * params.gamma * L
-    #
+
     # lorentzians_per_comb_line = np.hstack(points_for_lorentzian(_) for _ in freq_offset)
     lorentzians_per_comb_line = freq_offset
 
@@ -121,7 +126,10 @@ def get_polarization3(molecule, params):
             # reset the polarization because C-code performs "+="
             polarization_mnv[:] = 0.
 
-            for M_field_h, M_field_i, M_field_j in product(*(3 * [[params.omega_M1, params.omega_M2]])):
+            # all_modulations = product(*(3 * [[params.omega_M1, params.omega_M2]]))
+            all_modulations = product(*(3 * [[params.omega_M1, params.omega_M2, params.omega_M3]]))
+
+            for M_field_h, M_field_i, M_field_j in all_modulations:
                 pol3_new(
                     polarization_mnv, params,
                     M_field_h, M_field_i, M_field_j,
@@ -165,7 +173,7 @@ if __name__ == '__main__':
     E_10 = 0.6e-6
     E_21 = 2.354
     E_32 = 1.7e-6
-    central_freq = E_10 + E_21 - E_32
+    central_freq = 0.0
 
     molecule = ADict(
 
@@ -189,19 +197,22 @@ if __name__ == '__main__':
     )
 
     params = ADict(
-        N_frequency=500,
+        N_frequency=2000,
         comb_size=20,
-        freq_halfwidth=5.e-5,
+        freq_halfwidth=5e-5,
         central_freq=central_freq,
         omega_M1=central_freq-1e-6,
         omega_M2=central_freq-3e-6,
+        omega_M3=central_freq-2.5e-6,
         gamma=1e-9,
         delta_freq=2.5e-6,
     )
 
+    import time
+    start = time.time()
     # choosing the frequency range
-    # frequency = nonuniform_frequency_range_3(params)
-    frequency = uniform_frequency_range(params)
+    frequency = nonuniform_frequency_range_3(params)
+    # frequency = uniform_frequency_range(params)
     params['freq'] = frequency
     print params.freq.size
 
@@ -211,19 +222,28 @@ if __name__ == '__main__':
     comb_omega = (params.delta_freq * np.arange(-params.comb_size, params.comb_size))[np.newaxis, :]
     field1 = (params.gamma / ((omega - params.omega_M1 - comb_omega)**2 + params.gamma**2)).sum(axis=1)
     field2 = (params.gamma / ((omega - params.omega_M2 - comb_omega)**2 + params.gamma**2)).sum(axis=1)
+    field3 = (params.gamma / ((omega - params.omega_M3 - comb_omega)**2 + params.gamma**2)).sum(axis=1)
 
-    #plt.figure()
+    plt.figure()
+    comb_plot(frequency, field1/field1.max(), 'b-', alpha=0.5)
+    comb_plot(frequency, field2/field1.max(), 'r-', alpha=0.5)
+    comb_plot(frequency, field3/field1.max(), 'g-', alpha=0.5)
 
-    comb_plot(frequency, field1, 'b*-')
-    # plt.plot(frequency, field1, 'b*-')
-    comb_plot(frequency, field2, 'r*-')
-    # plt.plot(frequency, field2, 'r*-')
+    comb_plot(frequency, (pol3/(pol3.max())).real, 'k-')
+    plt.xlabel("$\\omega_1 + \\omega_2 - \\omega_3 + \\Delta \\omega (in GHz)$")
+    plt.ylabel("$\mathcal{R}e[P^{(3)}(\\omega)]$")
 
-    comb_plot(frequency, (pol3/(pol3.max()/field1.max())).real, 'k*-')
-    data = pickle.load(open("Pol3_data.pickle", "rb"))
-    pol3_ = data['molecules_pol3']
-    # plt.plot(frequency, pol3_ / (pol3_.max() / field1.max()), 'g*-')
-    # plt.xlim([30e-6, 35e-6])
+    with open("Pol3_data.pickle", "wb") as output_file:
+        pickle.dump(
+            {
+                "molecules_pol3": pol3,
+                "freq": frequency,
+                "field1": field1,
+                "field2": field2,
+                "field3": field3
+            }, output_file
+        )
 
+    print time.time() - start
     plt.show()
 
