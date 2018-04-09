@@ -2,7 +2,7 @@ from itertools import permutations, product, combinations_with_replacement
 from collections import namedtuple
 from ctypes import Structure, c_double, c_int, POINTER, Array
 
-from eval_pol3_wrapper import pol3_new
+from eval_pol3_wrapper import pol3_total
 
 ############################################################################################
 #                                                                                          #
@@ -107,7 +107,6 @@ def get_polarization3(molecule, params):
     :return: numpy.array -- polarization
     """
 
-
     # introducing aliases
     transition = molecule.transitions
     energy = molecule.energies
@@ -116,8 +115,8 @@ def get_polarization3(molecule, params):
     polarization = np.zeros(params.freq.size, dtype=np.complex)
     polarization_mnv = np.zeros_like(polarization)
 
-    # for m, n, v in permutations(range(1, len(energy))):
-    for m, n, v in [(1, 2, 3)]:
+    for m, n, v in permutations(range(1, len(energy))):
+    # for m, n, v in [(1, 2, 3)]:
         try:
             # calculate the product of the transition dipole if they are not zeros
             mu_product = transition[(0, v)].mu * transition[(v, n)].mu * \
@@ -130,12 +129,20 @@ def get_polarization3(molecule, params):
             all_modulations = product(*(3 * [[params.omega_M1, params.omega_M2, params.omega_M3]]))
 
             for M_field_h, M_field_i, M_field_j in all_modulations:
-                pol3_new(
+                # print m, n, v, M_field_h, M_field_i, M_field_j
+                pol3_total(
                     polarization_mnv, params,
                     M_field_h, M_field_i, M_field_j,
                     energy[n] - energy[v] + 1j * transition[(n, v)].g,
                     energy[m] - energy[v] + 1j * transition[(m, v)].g,
-                    energy[v] - energy[0] + 1j * transition[(v, 0)].g
+                    energy[v] - energy[0] + 1j * transition[(v, 0)].g,
+                    energy[n] - energy[0] + 1j * transition[(n, 0)].g,
+                    energy[m] - energy[0] + 1j * transition[(m, 0)].g,
+                    energy[m] - energy[n] + 1j * transition[(m, n)].g,
+                    energy[n] - energy[m] + 1j * transition[(n, m)].g,
+                    energy[v] - energy[n] + 1j * transition[(v, n)].g,
+                    energy[v] - energy[m] + 1j * transition[(v, m)].g,
+
                 )
 
             polarization_mnv *= mu_product
@@ -225,12 +232,15 @@ if __name__ == '__main__':
     field3 = (params.gamma / ((omega - params.omega_M3 - comb_omega)**2 + params.gamma**2)).sum(axis=1)
 
     plt.figure()
-    comb_plot(frequency, field1/field1.max(), 'b-', alpha=0.5)
-    comb_plot(frequency, field2/field1.max(), 'r-', alpha=0.5)
-    comb_plot(frequency, field3/field1.max(), 'g-', alpha=0.5)
+    plt.suptitle("Term$_{b_2}$")
+    # comb_plot(frequency, field1/field1.max(), 'b-', alpha=0.5)
+    # comb_plot(frequency, field2/field1.max(), 'r-', alpha=0.5)
+    # comb_plot(frequency, field3/field1.max(), 'g-', alpha=0.5)
 
-    comb_plot(frequency, (pol3/(pol3.max())).real, 'k-')
-    plt.xlabel("$\\omega_1 + \\omega_2 - \\omega_3 + \\Delta \\omega (in GHz)$")
+    # comb_plot(frequency, (pol3/(pol3.max())).real, 'k-')
+    comb_plot(frequency, pol3.real, 'k-')
+    plt.plot(frequency, np.zeros_like(frequency), 'k-')
+    plt.xlabel("$\\omega_1 + \\omega_2 - \\omega_3 + \\Delta \\omega$ (in GHz)")
     plt.ylabel("$\mathcal{R}e[P^{(3)}(\\omega)]$")
 
     with open("Pol3_data.pickle", "wb") as output_file:
@@ -246,4 +256,3 @@ if __name__ == '__main__':
 
     print time.time() - start
     plt.show()
-

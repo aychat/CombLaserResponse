@@ -160,8 +160,8 @@ class PolarizationTerms:
         self.omega = self.frequency[:, np.newaxis, np.newaxis]
         self.comb_omega1 = self.del_omega1[np.newaxis, :, np.newaxis]
         self.comb_omega2 = self.del_omega2[np.newaxis, np.newaxis, :]
-        self.shape_1 = gaussian*np.random.uniform(0.5, 1.0, self.del_omega1.size)[np.newaxis, :, np.newaxis]
-        self.shape_2 = gaussian*np.random.uniform(0.5, 1.0, self.del_omega2.size)[np.newaxis, np.newaxis, :]
+        self.shape_1 = gaussian[np.newaxis, :, np.newaxis]
+        self.shape_2 = gaussian[np.newaxis, np.newaxis, :]
 
         self.field1 = ne.evaluate(
             "sum(shape_1*gamma / ((omega - 2*omega_M1 - 2*comb_omega1)**2 + gamma**2), axis=2)",
@@ -181,13 +181,13 @@ class PolarizationTerms:
         # self.field1 *= shape1
         # self.field2 *= shape2
 
-        plt.figure()
-        plt.subplot(211)
-        plt.plot(self.frequency-2.*self.w_excited_1, self.field1, 'b')
-        plt.subplot(212)
-        plt.plot(self.frequency-2.*self.w_excited_1, self.field2, 'r')
-        plt.show()
-        self.pol2_freq_matrix = np.asarray([self.calculate_total_pol(**instance) for instance in self.molecules]).T
+        # plt.figure()
+        # plt.subplot(211)
+        # plt.plot(self.frequency-2.*self.w_excited_1, self.field1, 'b')
+        # plt.subplot(212)
+        # plt.plot(self.frequency-2.*self.w_excited_1, self.field2, 'r')
+        # plt.show()
+        # self.pol2_freq_matrix = np.asarray([self.calculate_total_pol(**instance) for instance in self.molecules]).T
 
     def calculate_pol_12_21(self, m, n, **params):
         """
@@ -233,10 +233,13 @@ class PolarizationTerms:
         delta = (self.omega - self.omega_M1 - self.omega_M2 - self.comb_omega1 - self.comb_omega2) ** 2 + 4. * self.gamma ** 2
         A_012 = params['w_' + str(n) + str(0)] - self.omega - 1j * params['g_' + str(n) + str(0)]
 
+        shape_1 = self.shape_1
+        shape_2 = self.shape_2
+
         return ne.evaluate(
-            "sum((((term_J1 + term_I)/(term_K1*term_K2)) + ((term_J2 - term_I)/(term_K1_d*term_K2_d)))/(delta*A_012), axis=2)"
+            "sum(shape_1*shape_2*(((term_J1 + term_I)/(term_K1*term_K2)) + ((term_J2 - term_I)/(term_K1_d*term_K2_d)))/(delta*A_012), axis=2)"
         ).sum(axis=1), ne.evaluate(
-            "sum((((term_J1 - term_I)/(term_K1*term_K2)) + ((term_J2 + term_I)/(term_K1_d*term_K2_d)))/(delta*A_012), axis=2)"
+            "sum(shape_1*shape_2*(((term_J1 - term_I)/(term_K1*term_K2)) + ((term_J2 + term_I)/(term_K1_d*term_K2_d)))/(delta*A_012), axis=2)"
         ).sum(axis=1)
 
     def calculate_pol_11_22_a1_a2(self, m, n, **params):
@@ -260,14 +263,16 @@ class PolarizationTerms:
         delta_2 = (self.omega - 2.*self.omega_M2 - 2.*self.comb_omega2) ** 2 + 4. * self.gamma ** 2
         A_012 = params['w_' + str(n) + str(0)] - self.omega - 1j * params['g_' + str(n) + str(0)]
 
+        shape_1 = self.shape_1
+        shape_2 = self.shape_2
         return ne.evaluate(
-            "sum((2.*term_J/(term_K1*term_K2))/(delta_1*A_012), axis=2)"
+            "sum(shape_1*shape_2*(2.*term_J/(term_K1*term_K2))/(delta_1*A_012), axis=2)"
         ).sum(axis=1), ne.evaluate(
-            "sum((2.*term_J/(term_K1_d*term_K2_d))/(delta_2*A_012), axis=2)"
+            "sum(shape_1*shape_2*(2.*term_J/(term_K1_d*term_K2_d))/(delta_2*A_012), axis=2)"
         ).sum(axis=1)
 
-    def calculate_total_pol(self, **params):
-        return self.calculate_pol_12_21(1, 2, **params) + self.calculate_pol_12_21(2, 1, **params)
+    # def calculate_total_pol(self, **params):
+    #     return self.calculate_pol_12_21(1, 2, **params) + self.calculate_pol_12_21(2, 1, **params)
 
     def calculate_chi(self, m, n, **params):
         return 1./((params['w_'+str(n)+str(0)] - self.frequency[:, np.newaxis]
@@ -292,7 +297,7 @@ if __name__ == '__main__':
         N_molecules=1,
         N_order=7,
         N_order_energy=9,
-        N_comb=25,
+        N_comb=50,
         N_frequency=2000,
         freq_halfwidth=1.e-5,
 
@@ -327,6 +332,7 @@ if __name__ == '__main__':
     # plt.ylabel("$-log_{10}(|P^{(2)}(\omega)|)$")
     # plt.show()
 
+    print(ensemble.molecules[0])
     ensemble.gamma = 1e-9
     # f, ax = plt.subplots(3, 3, sharex=True)
     # f.suptitle('$2^{nd}$ order nonlinear polarizations \n over a broad linewidth range (0.1Hz to 10MHz)')
@@ -360,15 +366,20 @@ if __name__ == '__main__':
 
     frequency_axis = np.linspace(-1e-5, 1e-5, ensemble.frequency.size)
     f, ax = plt.subplots(2, 1, sharex=True)
-    # f.suptitle("Contribution of 4 symmetric terms in the imaginary part of the $2^{nd}$ order nonlinear polarization")
+    f.suptitle("Contribution of 4 symmetric terms in the imaginary part of the $2^{nd}$ order nonlinear polarization")
     ax[0].plot(frequency_axis, ensemble.field1/(factor12 / factor11)/4e8, 'r', alpha=0.4)
     ax[0].plot(frequency_axis, ensemble.field2/(factor12 / factor11)/4e8, 'b', alpha=0.4)
     ax[1].plot(frequency_axis, ensemble.field1 / 4e8, 'r', alpha=0.4)
     ax[1].plot(frequency_axis, ensemble.field2 / 4e8, 'b', alpha=0.4)
-
+    #
     ax[0].plot(frequency_axis, pol_11.imag/factor12/4e8, 'firebrick', label='$\mathcal{Im}[P^{(2)}_{11}(\\omega)]$')
     ax[1].plot(frequency_axis, pol_12_21.imag/factor12/4e8, 'k', label='$\mathcal{Im}[P^{(2)}_{12}(\\omega)]$')
     ax[0].plot(frequency_axis, pol_22.imag/factor12/4e8, 'navy', label='$\mathcal{Im}[P^{(2)}_{22}(\\omega)]$')
+    #
+    # ax[0].plot(frequency_axis, pol_11.imag, 'firebrick', label='$\mathcal{Im}[P^{(2)}_{11}(\\omega)]$')
+    # ax[1].plot(frequency_axis, pol_12_21.imag, 'k', label='$\mathcal{Im}[P^{(2)}_{12}(\\omega)]$')
+    # ax[0].plot(frequency_axis, pol_22.imag, 'navy', label='$\mathcal{Im}[P^{(2)}_{22}(\\omega)]$')
+
     ax[0].legend(loc=1)
     ax[1].legend(loc=1)
     ax[0].set_ylabel("$\mathcal{Im}[P^{(2)}(\\omega)]$)")
@@ -408,25 +419,25 @@ if __name__ == '__main__':
     # plt.plot(pol_11.real, pol_11.imag, 'r.')
     # plt.plot(pol_22.real, pol_22.imag, 'k.')
 
-    f, ax = plt.subplots(1, 2, subplot_kw=dict(projection='polar'))
-    ax[0].plot([math.atan(z) for z in (pol_12_21.imag/pol_12_21.real)], np.abs(pol_12_21/factor12/4e8), 'r.', label='$P^{(2)}_{12/21}$')
-    ax[0].set_rlabel_position(135)
-    ax[0].legend(loc=6)
-    ax[1].plot([math.atan(z) for z in (pol_11.imag/pol_11.real)], np.abs(pol_11/factor12/4e8), 'b.', label='$P^{(2)}_{11}$')
-    ax[1].plot([math.atan(z) for z in (pol_22.imag/pol_22.real)], np.abs(pol_22/factor12/4e8), 'k.', label='$P^{(2)}_{22}$')
-    ax[1].set_rlabel_position(135)
-    ax[1].legend(loc=6)
+    # f, ax = plt.subplots(1, 2, subplot_kw=dict(projection='polar'))
+    # ax[0].plot([math.atan(z) for z in (pol_12_21.imag/pol_12_21.real)], np.abs(pol_12_21/factor12/4e8), 'r.', label='$P^{(2)}_{12/21}$')
+    # ax[0].set_rlabel_position(135)
+    # ax[0].legend(loc=6)
+    # ax[1].plot([math.atan(z) for z in (pol_11.imag/pol_11.real)], np.abs(pol_11/factor12/4e8), 'b.', label='$P^{(2)}_{11}$')
+    # ax[1].plot([math.atan(z) for z in (pol_22.imag/pol_22.real)], np.abs(pol_22/factor12/4e8), 'k.', label='$P^{(2)}_{22}$')
+    # ax[1].set_rlabel_position(135)
+    # ax[1].legend(loc=6)
 
-    plt.figure()
-    chi2 = ensemble.calculate_chi(2, 1, **ensemble.molecules[0]) + ensemble.calculate_chi(1, 2, **ensemble.molecules[0])
-    plt.subplot(221)
-    plt.imshow(chi2.real, extent=[frequency_axis.min(), frequency_axis.max(), frequency_axis.min(), frequency_axis.max()])
-    plt.subplot(222)
-    plt.imshow(chi2.imag, extent=[frequency_axis.min(), frequency_axis.max(), frequency_axis.min(), frequency_axis.max()])
-    plt.subplot(223)
-    plt.plot(chi2.sum(axis=1).real)
-    plt.plot(chi2.sum(axis=1).imag)
-    plt.subplot(224)
-    plt.plot(chi2.sum(axis=0).real)
-    plt.plot(chi2.sum(axis=0).imag)
+    # plt.figure()
+    # chi2 = ensemble.calculate_chi(2, 1, **ensemble.molecules[0]) + ensemble.calculate_chi(1, 2, **ensemble.molecules[0])
+    # plt.subplot(221)
+    # plt.imshow(chi2.real, extent=[frequency_axis.min(), frequency_axis.max(), frequency_axis.min(), frequency_axis.max()])
+    # plt.subplot(222)
+    # plt.imshow(chi2.imag, extent=[frequency_axis.min(), frequency_axis.max(), frequency_axis.min(), frequency_axis.max()])
+    # plt.subplot(223)
+    # plt.plot(chi2.sum(axis=1).real)
+    # plt.plot(chi2.sum(axis=1).imag)
+    # plt.subplot(224)
+    # plt.plot(chi2.sum(axis=0).real)
+    # plt.plot(chi2.sum(axis=0).imag)
     plt.show()
