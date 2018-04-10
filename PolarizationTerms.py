@@ -373,7 +373,7 @@ if __name__ == '__main__':
     ax[1].plot(frequency_axis, ensemble.field2 / 4e8, 'b', alpha=0.4)
     #
     ax[0].plot(frequency_axis, pol_11.imag/factor12/4e8, 'firebrick', label='$\mathcal{Im}[P^{(2)}_{11}(\\omega)]$')
-    ax[1].plot(frequency_axis, pol_12_21.imag/factor12/4e8, 'k', label='$\mathcal{Im}[P^{(2)}_{12}(\\omega)]$')
+    ax[1].plot(frequency_axis, pol_12_21.imag/factor12/4e8, 'k', label='$\mathcal{Im}[P^{(2)}_{12}(\\omega) + P^{(2)}_{21}(\\omega)]$')
     ax[0].plot(frequency_axis, pol_22.imag/factor12/4e8, 'navy', label='$\mathcal{Im}[P^{(2)}_{22}(\\omega)]$')
     #
     # ax[0].plot(frequency_axis, pol_11.imag, 'firebrick', label='$\mathcal{Im}[P^{(2)}_{11}(\\omega)]$')
@@ -400,7 +400,7 @@ if __name__ == '__main__':
     ax[1].plot(frequency_axis, ensemble.field2 / 4e8, 'b', alpha=0.4)
 
     ax[0].plot(frequency_axis, pol_11.real/factor12/4e8, 'firebrick', label='$\mathcal{Re}[P^{(2)}_{11}(\\omega)]$')
-    ax[1].plot(frequency_axis, pol_12_21.real/factor12/4e8, 'k', label='$\mathcal{Re}[P^{(2)}_{12}(\\omega)]$')
+    ax[1].plot(frequency_axis, pol_12_21.real/factor12/4e8, 'k', label='$\mathcal{Re}[P^{(2)}_{12}(\\omega) + P^{(2)}_{21}(\\omega)]$')
     ax[0].plot(frequency_axis, pol_22.real/factor12/4e8, 'navy', label='$\mathcal{Re}[P^{(2)}_{22}(\\omega)]$')
     ax[0].legend(loc=1)
     ax[1].legend(loc=1)
